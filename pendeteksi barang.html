@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Deteksi Barang Akurat</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f4f6fa;
+      padding: 30px;
+    }
+    h2 {
+      color: #2c3e50;
+    }
+    #upload {
+      margin: 20px 0;
+    }
+    #canvas {
+      max-width: 600px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    #log {
+      margin-top: 15px;
+      background: #ecf0f1;
+      padding: 10px;
+      border-radius: 6px;
+      width: 600px;
+      color: #34495e;
+    }
+  </style>
+</head>
+<body>
+  <h2>🔍 Deteksi Barang Saja (Akurat)</h2>
+  <input id="upload" type="file" accept="image/*" />
+  <canvas id="canvas"></canvas>
+  <div id="log">🔄 Memuat model...</div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const log = document.getElementById('log');
+    const animalClasses = [
+      'person','cat','dog','bird','horse','sheep',
+      'cow','elephant','bear','zebra','giraffe'
+    ];
+    let model;
+
+    async function init() {
+      log.innerText = '🔄 Memuat model COCO-SSD...';
+      model = await cocoSsd.load();
+      log.innerText = '✅ Model siap. Silakan unggah gambar.';
+    }
+
+    document.getElementById('upload').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = async () => {
+        // atur ukuran canvas sesuai gambar
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        log.innerText = '🔍 Mendeteksi objek...';
+        const predictions = await model.detect(img);
+
+        // bersihkan drawing
+        ctx.drawImage(img, 0, 0);
+        ctx.lineWidth = 2;
+        ctx.font = '18px sans-serif';
+
+        let count = 0;
+        predictions.forEach(p => {
+          const cls = p.class;
+          const score = p.score;
+          // hanya tampilkan benda buatan manusia dengan score >= 0.5
+          if (score >= 0.5 && !animalClasses.includes(cls)) {
+            count++;
+            const [x,y,w,h] = p.bbox;
+            // gambar kotak
+            ctx.strokeStyle = '#e74c3c';
+            ctx.strokeRect(x, y, w, h);
+            // label
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillText(`${cls} ${(score*100).toFixed(1)}%`, x+4, y+20);
+          }
+        });
+
+        if (count) {
+          log.innerHTML = `✅ Ditemukan <strong>${count}</strong> barang (confidence ≥ 50%).`;
+        } else {
+          log.innerText = '⚠️ Tidak ada barang terdeteksi dengan confidence ≥ 50%. Coba gambar lain.';
+        }
+      };
+    });
+
+    init();
+  </script>
+</body>
+</html>
